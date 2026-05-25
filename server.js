@@ -30,7 +30,20 @@ let lastSyncTime   = null;
 let lastSyncStats  = null;   // { total, active, newAccount, nonaktif, error }
 let sseClients     = [];     // Server-Sent Events clients
 
-const COOKIES_FILE = path.join(__dirname, 'ig_cookies.json');
+const IS_RAILWAY   = !!process.env.RAILWAY_ENVIRONMENT;
+const COOKIES_FILE = IS_RAILWAY
+  ? path.join('/tmp', 'ig_cookies.json')
+  : path.join(__dirname, 'ig_cookies.json');
+
+function ensureCookiesFromEnv() {
+  if (!process.env.IG_COOKIES_JSON || fs.existsSync(COOKIES_FILE)) return;
+  try {
+    fs.writeFileSync(COOKIES_FILE, process.env.IG_COOKIES_JSON.trim());
+    console.log('🍪 Cookies Instagram dimuat dari IG_COOKIES_JSON');
+  } catch (err) {
+    console.warn('Gagal menulis cookies dari env:', err.message);
+  }
+}
 const USER_AGENT   =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
   'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
@@ -55,7 +68,13 @@ async function initBrowser() {
   broadcast('log', { message: '🚀 Membuka browser Puppeteer...' });
   browser = await puppeteer.launch({
     headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+    ],
   });
   page = await browser.newPage();
   await page.setUserAgent(USER_AGENT);
@@ -152,6 +171,12 @@ async function loginInstagram(username, password) {
     fs.writeFileSync(COOKIES_FILE, JSON.stringify(cookies, null, 2));
     loggedIn = true;
     broadcast('log', { message: '✅ Login Instagram berhasil!' });
+    if (IS_RAILWAY) {
+      broadcast('log', {
+        message:
+          '💡 Supaya sesi tetap setelah redeploy: salin isi /tmp/ig_cookies.json ke variable IG_COOKIES_JSON di Railway.',
+      });
+    }
     return { success: true, message: 'Login berhasil!' };
   } catch (err) {
     return { success: false, message: err.message };
@@ -634,7 +659,15 @@ app.get('/spreadsheet-info', async (req, res) => {
 
 // ── Start ──
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-  console.log(`✅ Server berjalan di http://localhost:${PORT}`);
-  await initBrowser();
+app.listen(PORT, '0.0.0.0', async () => {
+  const host = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : `http://localhost:${PORT}`;
+  console.log(`✅ Server berjalan di ${host}`);
+  ensureCookiesFromEnv();
+  try {
+    await initBrowser();
+  } catch (err) {
+    console.warn('⚠️  Browser belum siap (akan dicoba saat login/sync):', err.message);
+  }
 });

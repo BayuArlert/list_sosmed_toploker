@@ -10,6 +10,20 @@ require('dotenv').config();
 const SPREADSHEET_ID   = process.env.SPREADSHEET_ID || '1pLnRYLDW1kqu0UJm326OrAKO866Q0kFdyZFdQcGRgmU';
 const CREDENTIALS_FILE = path.join(__dirname, 'credentials.json');
 
+function loadGoogleCredentials() {
+  if (process.env.GOOGLE_CREDENTIALS) {
+    try {
+      return JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    } catch {
+      throw new Error('GOOGLE_CREDENTIALS tidak valid (harus JSON service account)');
+    }
+  }
+  if (fs.existsSync(CREDENTIALS_FILE)) {
+    return JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+  }
+  return null;
+}
+
 const SHEET_NAMES = [
   'JAWA 2026',
   'SULAWESI 2026',
@@ -35,20 +49,18 @@ function columnToLetter(col) {
   return letter;
 }
 
-// Cek apakah credentials.json sudah ada
 function checkCredentials() {
-  return fs.existsSync(CREDENTIALS_FILE);
+  return !!loadGoogleCredentials();
 }
 
-// Buat auth client dari service account
 async function getAuth() {
-  if (!checkCredentials()) {
+  const credentials = loadGoogleCredentials();
+  if (!credentials) {
     throw new Error(
-      'File credentials.json tidak ditemukan! ' +
-      'Silakan setup Google Cloud Service Account dan letakkan credentials.json di folder project.'
+      'Google credentials tidak ditemukan! ' +
+      'Set GOOGLE_CREDENTIALS di Railway, atau letakkan credentials.json di folder project.'
     );
   }
-  const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
   return new google.auth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
