@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>IG Follower Sync — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #0a0d14;
+    --surface:  #111827;
+    --card:     #1a2236;
+    --border:   #1e2d45;
+    --accent:   #6366f1;
+    --accent2:  #818cf8;
+    --green:    #22c55e;
+    --yellow:   #f59e0b;
+    --red:      #ef4444;
+    --blue:     #3b82f6;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --font:     'Inter', sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+
+  /* ── Layout ── */
+  .wrapper{max-width:1100px;margin:0 auto;padding:32px 20px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:36px}
+  .logo{display:flex;align-items:center;gap:12px}
+  .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),#a855f7);border-radius:12px;display:grid;place-items:center;font-size:22px}
+  .logo h1{font-size:1.3rem;font-weight:700;background:linear-gradient(to right,#c7d2fe,#a5b4fc);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .logo p{font-size:.75rem;color:var(--muted);margin-top:1px}
+
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;font-size:.75rem;font-weight:600;border:1px solid}
+  .badge.ok   {background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:var(--green)}
+  .badge.warn {background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:var(--yellow)}
+  .badge.err  {background:rgba(239,68,68,.1) ;border-color:rgba(239,68,68,.3) ;color:var(--red)}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* ── Cards grid ── */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 24px;transition:transform .2s}
+  .card:hover{transform:translateY(-2px)}
+  .card-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+  .card-value{font-size:1.6rem;font-weight:700}
+  .card-sub{font-size:.72rem;color:var(--muted);margin-top:4px}
+  .c-green{color:var(--green)} .c-yellow{color:var(--yellow)} .c-red{color:var(--red)} .c-blue{color:var(--blue)} .c-accent{color:var(--accent2)}
+
+  /* ── Section ── */
+  .section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px}
+  .section-title{font-size:.85rem;font-weight:600;color:var(--accent2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+
+  /* ── Buttons ── */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#a855f7);color:#fff}
+  .btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-outline:hover{border-color:var(--accent);color:var(--accent2)}
+  .btn-danger{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:var(--red)}
+  .btn-danger:hover{background:rgba(239,68,68,.25)}
+  .btn-green{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff}
+  .btn-green:hover{opacity:.88;transform:translateY(-1px)}
+
+  /* ── Form ── */
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+  .form-group label{display:block;font-size:.75rem;color:var(--muted);margin-bottom:6px}
+  .form-group input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:.87rem;outline:none;transition:border-color .2s}
+  .form-group input:focus{border-color:var(--accent)}
+
+  /* ── Progress ── */
+  .progress-bar-wrap{background:var(--surface);border-radius:999px;height:8px;overflow:hidden;margin:14px 0}
+  .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),#a855f7);border-radius:999px;transition:width .4s;width:0%}
+  .progress-label{font-size:.75rem;color:var(--muted);margin-top:4px;text-align:right}
+
+  /* ── Terminal log ── */
+  .terminal{background:#0d1117;border:1px solid #1e2d45;border-radius:12px;padding:16px;height:340px;overflow-y:auto;font-family:'Courier New',monospace;font-size:.78rem;line-height:1.7}
+  .terminal::-webkit-scrollbar{width:4px}
+  .terminal::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  .log-line{animation:fadeIn .2s}
+  @keyframes fadeIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+  .log-ok   {color:var(--green)}
+  .log-err  {color:var(--red)}
+  .log-warn {color:var(--yellow)}
+  .log-info {color:#94a3b8}
+  .log-accent{color:var(--accent2)}
+
+  /* ── Sync button area ── */
+  .sync-area{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .spin{animation:spin 1s linear infinite}
+  @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+  /* ── Collapsible ── */
+  details summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:.85rem;font-weight:600}
+  details summary::after{content:'▾';color:var(--muted);font-size:.8rem}
+  details[open] summary::after{content:'▴'}
+  details .inner{margin-top:18px}
+
+  /* ── Alert ── */
+  .alert{padding:12px 16px;border-radius:10px;font-size:.82rem;display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
+  .alert-info{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#93c5fd}
+  .alert-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:#fcd34d}
+  .alert-ok  {background:rgba(34,197,94,.1) ;border:1px solid rgba(34,197,94,.25) ;color:#86efac}
+
+  #spreadsheet-info{font-size:.8rem;color:var(--muted)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.15);color:var(--accent2);margin:2px}
+
+  @media(max-width:600px){.form-row{grid-template-columns:1fr}.sync-area{flex-direction:column;align-items:stretch}}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">📊</div>
+      <div>
+        <h1>IG Follower Sync</h1>
+        <p>Instagram × Google Sheets Automation</p>
+      </div>
+    </div>
+    <span id="header-badge" class="badge warn"><span class="dot"></span>Memuat...</span>
+  </header>
+
+  <!-- ── STATUS CARDS ── -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Instagram</div>
+      <div class="card-value c-green" id="st-login">—</div>
+      <div class="card-sub">Status sesi</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Last Sync</div>
+      <div class="card-value c-accent" id="st-last" style="font-size:1rem;padding-top:6px">—</div>
+      <div class="card-sub">Sync terakhir</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Jadwal</div>
+      <div class="card-value c-blue" style="font-size:1.2rem;padding-top:4px">07:00 WIB</div>
+      <div class="card-sub">Setiap hari</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Credentials</div>
+      <div class="card-value c-yellow" id="st-creds">—</div>
+      <div class="card-sub">Google Service Account</div>
+    </div>
+  </div>
+
+  <!-- ── HASIL SYNC TERAKHIR ── -->
+  <div class="cards" id="stats-row" style="display:none">
+    <div class="card"><div class="card-label">Total Akun</div><div class="card-value c-accent" id="s-total">0</div></div>
+    <div class="card"><div class="card-label">✅ Aktif</div><div class="card-value c-green" id="s-active">0</div></div>
+    <div class="card"><div class="card-label">🆕 NEW</div><div class="card-value c-yellow" id="s-new">0</div></div>
+    <div class="card"><div class="card-label">❌ Nonaktif</div><div class="card-value c-red" id="s-nonaktif">0</div></div>
+    <div class="card"><div class="card-label">⚠️ Error</div><div class="card-value c-muted" id="s-error">0</div></div>
+  </div>
+
+  <!-- ── SYNC CONTROL ── -->
+  <div class="section">
+    <div class="section-title">⚡ Kontrol Sync</div>
+    <div class="sync-area">
+      <button class="btn btn-primary" id="btn-sync" onclick="triggerSync()">
+        <span id="sync-icon">🔄</span> Sync Sekarang
+      </button>
+      <button class="btn btn-danger" id="btn-stop" onclick="stopSync()" style="display:none">
+        ⛔ Stop Sync
+      </button>
+      <div id="sync-status-text" style="font-size:.82rem;color:var(--muted)">
+        Klik untuk mulai scrape semua akun dari Sheets
+      </div>
+    </div>
+    <div class="progress-bar-wrap" id="progress-wrap" style="display:none">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="progress-label" id="progress-label"></div>
+  </div>
+
+  <!-- ── TERMINAL LOG ── -->
+  <div class="section">
+    <div class="section-title" style="justify-content:space-between">
+      <span>🖥️ Live Log</span>
+      <button class="btn btn-outline" onclick="clearLog()" style="padding:4px 12px;font-size:.72rem">Bersihkan</button>
+    </div>
+    <div class="terminal" id="terminal">
+      <div class="log-info log-line">Siap. Tekan "Sync Sekarang" atau tunggu jadwal jam 07:00 WIB.</div>
+    </div>
+  </div>
+
+  <!-- ── LOGIN INSTAGRAM ── -->
+  <div class="section">
+    <details>
+      <summary>🔐 Login / Logout Instagram</summary>
+      <div class="inner">
+        <div class="alert alert-info">💡 Login diperlukan agar scraping mendapat data followers yang akurat. Cookies disimpan otomatis.</div>
+        <div id="login-status-box"></div>
+        <div id="login-form">
+          <div class="form-row">
+            <div class="form-group"><label>Username Instagram</label><input type="text" id="ig-user" placeholder="username" autocomplete="off"/></div>
+            <div class="form-group"><label>Password</label><input type="password" id="ig-pass" placeholder="••••••••"/></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-green" onclick="doLogin()">🔐 Login</button>
+            <button class="btn btn-danger" onclick="doLogout()">🚪 Logout</button>
+          </div>
+        </div>
+        <div id="login-msg" style="margin-top:12px;font-size:.82rem"></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ── SETUP GUIDE ── -->
+  <div class="section">
+    <details>
+      <summary>⚙️ Panduan Setup Google Credentials</summary>
+      <div class="inner">
+        <div class="alert alert-warn">⚠️ Harus dilakukan sekali sebelum pertama kali sync ke Google Sheets.</div>
+        <ol style="font-size:.83rem;line-height:2;padding-left:20px;color:var(--text)">
+          <li>Buka <a href="https://console.cloud.google.com" target="_blank" style="color:var(--accent2)">console.cloud.google.com</a> → buat project baru</li>
+          <li>Aktifkan <b>Google Sheets API</b> (Library → cari "Sheets API" → Enable)</li>
+          <li>Buka <b>IAM &amp; Admin → Service Accounts</b> → Create Service Account</li>
+          <li>Setelah dibuat, klik akun tersebut → tab <b>Keys</b> → Add Key → JSON → Download</li>
+          <li>Rename file yang didownload menjadi <span class="tag">credentials.json</span> dan letakkan di folder project ini</li>
+          <li>Copy email service account (format: <i>nama@project.iam.gserviceaccount.com</i>)</li>
+          <li>Buka Google Spreadsheet → klik Share → paste email tadi → beri akses <b>Editor</b></li>
+          <li>Restart server → status Credentials akan berubah menjadi ✅</li>
+        </ol>
+        <div id="spreadsheet-info" style="margin-top:14px"></div>
+      </div>
+    </details>
+  </div>
+
+</div><!-- /wrapper -->
+
+<script>
+const API = 'http://localhost:3000';
+let evtSource = null;
+
+// ── SSE connect ──
+function connectSSE() {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource(`${API}/events`);
+  evtSource.onmessage = e => handleEvent(JSON.parse(e.data));
+  evtSource.onerror   = () => { setTimeout(connectSSE, 3000); };
+}
+
+function handleEvent(d) {
+  if (d.type === 'log')       appendLog(d.message);
+  if (d.type === 'progress')  updateProgress(d.current, d.total);
+  if (d.type === 'syncStart') setSyncing(true);
+  if (d.type === 'syncEnd') {
+    setSyncing(false);
+    if (d.stats) showStats(d.stats);
+    refreshStatus();
+  }
+}
+
+// ── Log terminal ──
+function appendLog(msg) {
+  const term = document.getElementById('terminal');
+  const div  = document.createElement('div');
+  div.classList.add('log-line');
+  if (/✅|berhasil|aktif/i.test(msg))       div.classList.add('log-ok');
+  else if (/❌|error|gagal|nonaktif/i.test(msg)) div.classList.add('log-err');
+  else if (/⚠️|warn|lewati/i.test(msg))    div.classList.add('log-warn');
+  else if (/🔄|📊|📋|📄|⏰/i.test(msg))   div.classList.add('log-accent');
+  else                                       div.classList.add('log-info');
+  div.textContent = `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`;
+  term.appendChild(div);
+  term.scrollTop = term.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('terminal').innerHTML = '<div class="log-info log-line">Log dibersihkan.</div>';
+}
+
+// ── Progress ──
+function updateProgress(cur, total) {
+  const wrap  = document.getElementById('progress-wrap');
+  const fill  = document.getElementById('progress-fill');
+  const label = document.getElementById('progress-label');
+  wrap.style.display = 'block';
+  const pct = total > 0 ? Math.round((cur / total) * 100) : 0;
+  fill.style.width   = pct + '%';
+  label.textContent  = `${cur} / ${total} akun (${pct}%)`;
+}
+
+// ── Sync state ──
+function setSyncing(active) {
+  const btn     = document.getElementById('btn-sync');
+  const btnStop = document.getElementById('btn-stop');
+  const icon    = document.getElementById('sync-icon');
+  const txt     = document.getElementById('sync-status-text');
+  btn.disabled      = active;
+  btnStop.style.display = active ? 'inline-flex' : 'none';
+  icon.className    = active ? 'spin' : '';
+  icon.textContent  = active ? '⏳' : '🔄';
+  txt.textContent   = active ? 'Sedang sync, harap tunggu...' : 'Sync selesai.';
+}
+
+// ── Stats cards ──
+function showStats(s) {
+  document.getElementById('stats-row').style.display = 'grid';
+  document.getElementById('s-total').textContent   = s.total   || 0;
+  document.getElementById('s-active').textContent  = s.active  || 0;
+  document.getElementById('s-new').textContent     = s.newAccount || 0;
+  document.getElementById('s-nonaktif').textContent = s.nonaktif || 0;
+  document.getElementById('s-error').textContent   = s.error   || 0;
+}
+
+// ── Refresh status ──
+async function refreshStatus() {
+  try {
+    const r = await fetch(`${API}/status`).then(r => r.json());
+    const badge = document.getElementById('header-badge');
+
+    document.getElementById('st-login').textContent = r.loggedIn ? '✅ Login' : '⚠️ Belum Login';
+    document.getElementById('st-login').className   = 'card-value ' + (r.loggedIn ? 'c-green' : 'c-yellow');
+    document.getElementById('st-creds').textContent = r.credentialsReady ? '✅ Siap' : '❌ Belum Ada';
+    document.getElementById('st-creds').className   = 'card-value ' + (r.credentialsReady ? 'c-green' : 'c-red');
+
+    if (r.lastSyncTime) {
+      const d = new Date(r.lastSyncTime);
+      document.getElementById('st-last').textContent = d.toLocaleString('id-ID', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    }
+
+    if (r.lastSyncStats) showStats(r.lastSyncStats);
+
+    const ok = r.loggedIn && r.credentialsReady;
+    badge.className  = 'badge ' + (ok ? 'ok' : 'warn');
+    badge.innerHTML  = `<span class="dot"></span>${ok ? 'Siap Sync' : 'Setup Diperlukan'}`;
+  } catch {
+    document.getElementById('header-badge').className = 'badge err';
+    document.getElementById('header-badge').innerHTML = '<span class="dot"></span>Server Offline';
+    appendLog('❌ Tidak bisa terhubung ke server. Pastikan server berjalan.');
+  }
+}
+
+// ── Sync trigger ──
+async function triggerSync() {
+  try {
+    const r = await fetch(`${API}/sync`, { method: 'POST' }).then(r => r.json());
+    if (!r.success) appendLog('⚠️ ' + r.message);
+    else { setSyncing(true); document.getElementById('progress-wrap').style.display = 'block'; }
+  } catch {
+    appendLog('❌ Tidak bisa menghubungi server.');
+  }
+}
+
+async function stopSync() {
+  const btnStop = document.getElementById('btn-stop');
+  btnStop.disabled = true;
+  btnStop.textContent = '⏳ Menghentikan...';
+  try {
+    const r = await fetch(`${API}/sync/stop`, { method: 'POST' }).then(r => r.json());
+    appendLog(r.success ? '⛔ ' + r.message : '⚠️ ' + r.message);
+  } catch {
+    appendLog('❌ Tidak bisa menghubungi server.');
+  }
+  setTimeout(() => {
+    btnStop.disabled = false;
+    btnStop.innerHTML = '⛔ Stop Sync';
+  }, 2000);
+}
+
+// ── Login / Logout ──
+async function doLogin() {
+  const u = document.getElementById('ig-user').value.trim();
+  const p = document.getElementById('ig-pass').value;
+  if (!u || !p) return showLoginMsg('⚠️ Isi username dan password dulu.', 'warn');
+  showLoginMsg('🔐 Mencoba login...', 'info');
+  const r = await fetch(`${API}/instagram-login`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ username: u, password: p }),
+  }).then(r => r.json()).catch(() => ({ success: false, message: 'Server tidak merespons' }));
+  showLoginMsg(r.success ? '✅ ' + r.message : '❌ ' + r.message, r.success ? 'ok' : 'err');
+  if (r.success) refreshStatus();
+}
+
+async function doLogout() {
+  const r = await fetch(`${API}/instagram-logout`, { method: 'POST' }).then(r => r.json()).catch(() => ({}));
+  showLoginMsg('🚪 Logout berhasil.', 'ok');
+  refreshStatus();
+}
+
+function showLoginMsg(msg, type) {
+  const el = document.getElementById('login-msg');
+  el.className = 'alert alert-' + (type === 'ok' ? 'ok' : type === 'err' ? '' : 'info');
+  el.style.background = type === 'err' ? 'rgba(239,68,68,.1)' : '';
+  el.style.border     = type === 'err' ? '1px solid rgba(239,68,68,.3)' : '';
+  el.style.color      = type === 'err' ? 'var(--red)' : '';
+  el.style.padding    = '10px 14px';
+  el.style.borderRadius = '8px';
+  el.textContent = msg;
+}
+
+// ── Init ──
+connectSSE();
+refreshStatus();
+setInterval(refreshStatus, 30000);
+</script>
+</body>
+</html>
