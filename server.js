@@ -115,11 +115,37 @@ async function loginInstagram(username, password) {
     }).catch(() => {});
     await sleep(1000);
 
-    // Coba temukan form login. Kadang Instagram menampilkan landing page dengan tombol "Log in" dulu.
-    let userSel = await page.evaluate(() => {
-      if (document.querySelector('input[name="username"]')) return 'input[name="username"]';
-      return null;
-    });
+    const userSelectors = [
+      'input[name="username"]',
+      'input[aria-label*="username" i]',
+      'input[aria-label*="phone number" i]',
+      'input[aria-label*="email" i]',
+      'input[type="text"]',
+    ];
+    const passSelectors = [
+      'input[name="password"]',
+      'input[type="password"]',
+    ];
+
+    async function getPageDiag() {
+      try {
+        const diag = await page.evaluate(() => {
+          const title = document.title || '';
+          const h1 = (document.querySelector('h1')?.innerText || '').trim();
+          const bodyText = (document.body?.innerText || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 400);
+          return { title, h1, bodyText };
+        });
+        return `${page.url()} | title="${diag.title}" | h1="${diag.h1}" | text="${diag.bodyText}"`;
+      } catch {
+        return page.url();
+      }
+    }
+
+    // Kadang IG menampilkan landing page dengan tombol "Log in" dulu.
+    let userSel = null;
 
     if (!userSel) {
       // Cari dan klik tombol "Log in" jika form tidak langsung terlihat
@@ -128,22 +154,38 @@ async function loginInstagram(username, password) {
         if (btns.length > 0) btns[btns.length - 1].click(); // Biasa tombol paling spesifik ada di akhir
       }).catch(() => {});
       await sleep(3000);
-      userSel = await page.evaluate(() => {
-        if (document.querySelector('input[name="username"]')) return 'input[name="username"]';
-        return null;
-      });
     }
-    
-    if (!userSel) throw new Error('Form login tidak ditemukan. Coba lagi atau gunakan auth manual.');
+
+    // Tunggu input username muncul (selector fleksibel)
+    for (const sel of userSelectors) {
+      try {
+        await page.waitForSelector(sel, { timeout: 12000 });
+        userSel = sel;
+        break;
+      } catch {}
+    }
+
+    if (!userSel) {
+      const diag = await getPageDiag();
+      throw new Error(
+        'Form login tidak ditemukan. Biasanya karena IG blokir/butuh verifikasi dari IP server.\n' +
+        `Diag: ${diag}\n` +
+        'Solusi paling stabil: login sekali di lokal, lalu set IG_COOKIES_JSON di Railway.'
+      );
+    }
 
     await page.click(userSel);
     await page.type(userSel, username, { delay: 80 });
     await sleep(500);
 
-    const passSel = await page.evaluate(() => {
-      if (document.querySelector('input[name="password"]')) return 'input[name="password"]';
-      return null;
-    });
+    let passSel = null;
+    for (const sel of passSelectors) {
+      try {
+        await page.waitForSelector(sel, { timeout: 8000 });
+        passSel = sel;
+        break;
+      } catch {}
+    }
     if (passSel) {
       await page.click(passSel);
       await page.type(passSel, password, { delay: 80 });
