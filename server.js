@@ -588,6 +588,11 @@ console.log('⏰ Scheduler aktif: sync otomatis setiap pagi jam 07:00 WIB (Asia/
 //  ENDPOINTS
 // ═══════════════════════════════════════════════
 
+// Dashboard UI
+app.get('/', (req, res) => {
+  res.sendFile('index.html', { root: __dirname });
+});
+
 // SSE — stream log & progress ke UI
 app.get('/events', (req, res) => {
   res.setHeader('Content-Type',  'text/event-stream');
