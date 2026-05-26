@@ -21,7 +21,7 @@ git push -u origin main
 1. Buka [railway.app](https://railway.app) → login
 2. **New Project** → **Deploy from GitHub repo**
 3. Pilih repository ini
-4. Railway otomatis mendeteksi Node.js dan menjalankan `npm start`
+4. Railway membangun image dari `Dockerfile` dan menjalankan `npm start`
 
 ## 3. Environment Variables (wajib)
 

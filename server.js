@@ -66,7 +66,7 @@ function broadcast(type, payload) {
 async function initBrowser() {
   if (browser && browser.isConnected()) return;
   broadcast('log', { message: '🚀 Membuka browser Puppeteer...' });
-  browser = await puppeteer.launch({
+  const launchOpts = {
     headless: 'new',
     args: [
       '--no-sandbox',
@@ -75,7 +75,11 @@ async function initBrowser() {
       '--disable-gpu',
       '--disable-blink-features=AutomationControlled',
     ],
-  });
+  };
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  browser = await puppeteer.launch(launchOpts);
   page = await browser.newPage();
   await page.setUserAgent(USER_AGENT);
   await page.evaluateOnNewDocument(() => {
