@@ -7,7 +7,7 @@ const path = require('path');
 const fs   = require('fs');
 require('dotenv').config();
 
-const SPREADSHEET_ID   = process.env.SPREADSHEET_ID || '1pLnRYLDW1kqu0UJm326OrAKO866Q0kFdyZFdQcGRgmU';
+const SPREADSHEET_ID   = process.env.SPREADSHEET_ID || '1g9J5nx5GJXANj0Vs_-MYuULnuTeD9zDNC2PVWCYu_2k';
 const CREDENTIALS_FILE = path.join(__dirname, 'credentials.json');
 
 function loadGoogleCredentials() {
@@ -24,14 +24,7 @@ function loadGoogleCredentials() {
   return null;
 }
 
-const SHEET_NAMES = [
-  'JAWA 2026',
-  'SULAWESI 2026',
-  'SUMATERA & RIAU 2026',
-  'KALIMANTAN 2026',
-  'BALI, NTB & NTT 2026',
-  'MALUKU & PAPUA 2026',
-];
+// Dynamic sheet names will be fetched directly using getSpreadsheetInfo()
 
 const MONTHS_ID = [
   'JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI',
@@ -73,66 +66,64 @@ async function getSheetsClient() {
 }
 
 /**
- * Temukan kolom hari ini (0-based index) berdasarkan baris bulan & tanggal di sheet.
- * Baris 2 (index 1) = nama bulan, Baris 3 (index 2) = angka tanggal.
- * Ambil tanggal terdekat ≤ hari ini dalam bulan yang sama.
+ * Temukan kolom target (0-based index) berdasarkan baris bulan & tanggal di sheet.
+ * Mode default: cari tanggal hari ini, kalau tidak ada pakai tanggal terdekat <= hari ini.
+ * Env SHEETS_DATE_MODE:
+ *   - closest (default): kolom tanggal terdekat ke hari ini (mundur atau maju)
+ *   - nearest: tanggal hari ini, fallback ke tanggal terdekat <= hari ini
+ *   - upcoming: tanggal hari ini, fallback ke tanggal terdekat >= hari ini
+ *   - exact: hanya tanggal persis hari ini
+ *   - latest: kolom tanggal terbaru di bulan ini
  */
 async function findTodayColumn(sheetsClient, sheetName) {
+  const meta = await findTodayColumnMeta(sheetsClient, sheetName);
+  return meta?.col ?? null;
+}
+
+async function findTodayColumnMeta(sheetsClient, sheetName) {
   const today     = new Date();
   const todayDate = today.getDate();
-  const monthName = MONTHS_ID[today.getMonth()]; // mis. 'MEI'
+  const monthName = MONTHS_ID[today.getMonth()];
 
   let rows;
   try {
     const resp = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `'${sheetName}'!A1:ZZ6`, // baca 6 baris pertama
+      range: `'${sheetName}'!A1:ZZ1`, // baca baris pertama
     });
     rows = resp.data.values || [];
   } catch {
     return null;
   }
 
-  // Auto-detect: cari baris yang mengandung nama bulan saat ini
-  // (berbeda sheet bisa di baris 2 atau baris 4)
-  let headerRowIdx = -1;
-  for (let r = 0; r < rows.length; r++) {
-    const rowStr = (rows[r] || []).join(' ').toUpperCase();
-    if (rowStr.includes(monthName)) {
-      headerRowIdx = r;
-      break;
-    }
-  }
-  if (headerRowIdx === -1) return null; // bulan tidak ditemukan di sheet ini
-
-  const row2 = rows[headerRowIdx]     || []; // baris nama bulan
-  const row3 = rows[headerRowIdx + 1] || []; // baris angka tanggal
-
-  // Temukan kolom MULAI bulan ini dan kolom MULAI bulan berikutnya.
-  // Nama bulan hanya muncul di 1 sel (merged cell), tanggal-tanggalnya di kolom sesudahnya.
+  const row1 = rows[0] || [];
   let monthStart = -1;
-  let monthEnd   = row2.length;
 
-  for (let c = 4; c < row2.length; c++) {
-    const cell = (row2[c] || '').toString().toUpperCase().trim();
+  // Cari kolom yang memiliki nama bulan (karena merge, teks hanya ada di kolom awal merge)
+  for (let c = 3; c < row1.length; c++) {
+    const cell = (row1[c] || '').toString().toUpperCase().trim();
     if (cell.includes(monthName)) {
-      monthStart = c; // kolom pertama bulan ini
-    } else if (monthStart !== -1 && cell !== '') {
-      // Ketemu nama bulan berikutnya → batas akhir
-      monthEnd = c;
+      monthStart = c;
       break;
     }
   }
 
   if (monthStart === -1) return null;
 
-  // Scan dari monthStart s/d monthEnd, cari tanggal === hari ini
-  for (let c = monthStart; c < monthEnd; c++) {
-    const d = parseInt((row3[c] || '').toString().trim());
-    if (!isNaN(d) && d === todayDate) return c; // 0-based
-  }
+  // Tentukan offset berdasarkan tanggal hari ini
+  // 1-7: minggu 1 (offset +0)
+  // 8-14: minggu 2 (offset +1)
+  // 15-21: minggu 3 (offset +2)
+  // 22+: minggu 4 (offset +3)
+  let weekOffset = 0;
+  if (todayDate <= 7) weekOffset = 0;
+  else if (todayDate <= 14) weekOffset = 1;
+  else if (todayDate <= 21) weekOffset = 2;
+  else weekOffset = 3;
 
-  return null; // tidak ada kolom persis hari ini → skip tulis
+  const targetCol = monthStart + weekOffset;
+
+  return { col: targetCol, week: weekOffset + 1, monthName };
 }
 
 /**
@@ -143,40 +134,64 @@ async function readAllLinks(onProgress) {
   const sheetsClient = await getSheetsClient();
   const allLinks = [];
 
-  for (const sheetName of SHEET_NAMES) {
+  let sheetNames = [];
+  try {
+    const info = await getSpreadsheetInfo();
+    sheetNames = info.sheets;
+  } catch (err) {
+    if (onProgress) onProgress(`⚠️ Gagal mengambil info spreadsheet: ${err.message}`);
+    return allLinks;
+  }
+
+  for (const sheetName of sheetNames) {
+    if (sheetName.toLowerCase().includes('dashboard')) {
+      if (onProgress) onProgress(`Lewati sheet: ${sheetName}`);
+      continue;
+    }
+
+
     try {
-      if (onProgress) onProgress(`📄 Membaca sheet: ${sheetName}`);
+      if (onProgress) onProgress(`\n📄 Membaca sheet: ${sheetName}...`);
 
       const resp = await sheetsClient.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `'${sheetName}'!A:E`,
+        range: `'${sheetName}'!A:D`, // Kolom A, B, C, D
       });
       const rows = resp.data.values || [];
 
-      const todayCol = await findTodayColumn(sheetsClient, sheetName);
+      const todayMeta = await findTodayColumnMeta(sheetsClient, sheetName);
+      const todayCol = todayMeta?.col ?? null;
 
-      for (let i = 0; i < rows.length; i++) {
+      if (onProgress && todayMeta) {
+        onProgress(`📅 ${sheetName}: kolom target adalah Minggu ke-${todayMeta.week} di bulan ${todayMeta.monthName}`);
+      } else if (onProgress) {
+        onProgress(`⚠️  ${sheetName}: kolom bulan ${MONTHS_ID[new Date().getMonth()]} tidak ditemukan — scrape tetap jalan, tulis ke sheet dilewati`);
+      }
+
+      // Mulai iterasi dari indeks 3 (Baris ke-4 di Excel/SPS), karena 3 baris pertama adalah header
+      for (let i = 3; i < rows.length; i++) {
         const row      = rows[i] || [];
-        const noCell   = (row[0] || '').toString().trim();
-        // JAWA 2026: col[1]=nama, col[2]=checkbox
-        // sheet lain:  col[1]=checkbox(TRUE/FALSE), col[2]=nama
-        const col1 = (row[1] || '').toString().trim();
-        const col2 = (row[2] || '').toString().trim();
-        const namaArea = /^(TRUE|FALSE)$/i.test(col1) ? col2 : col1;
-        const link     = (row[3] || '').toString().trim();
+        const noCell   = (row[0] || '').toString().trim(); // Kolom A: NO
+        const namaArea = (row[1] || '').toString().trim(); // Kolom B: Nama Akun / Kota
+        const link     = (row[2] || '').toString().trim(); // Kolom C: Link Akun
 
         // Lewati baris tanpa nomor urut atau tanpa link
         if (!noCell || !link) continue;
-        if (!/^\d+$/.test(noCell)) continue;
+        
+        // Cek apakah sel dimulai dengan angka (mengizinkan "1.", "1)", " 1 ", dll)
+        if (!/^\d+/.test(noCell)) continue;
+        
         if (/total|rata|jumlah/i.test(namaArea)) continue;
 
         allLinks.push({
           sheetName,
-          rowIndex: i + 1,  // 1-indexed
+          rowIndex: i + 1,  // 1-indexed untuk penulisan A1 notation
           rowNumber: noCell,
           namaArea,
           link,
           todayCol,
+          targetDate: `Minggu ${todayMeta?.week || '?'}`,
+          targetDateMode: 'week',
         });
       }
     } catch (err) {
@@ -226,6 +241,5 @@ module.exports = {
   readAllLinks,
   writeResult,
   getSpreadsheetInfo,
-  SHEET_NAMES,
   SPREADSHEET_ID,
 };

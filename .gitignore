@@ -5,3 +5,8 @@ ig_cookies.json
 *.log
 .DS_Store
 Thumbs.db
+node_modules/
+.env
+credentials.json
+cookies.json
+.DS_Store

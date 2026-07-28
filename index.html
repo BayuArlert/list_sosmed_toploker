@@ -63,6 +63,8 @@
   .btn-danger:hover{background:rgba(239,68,68,.25)}
   .btn-green{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff}
   .btn-green:hover{opacity:.88;transform:translateY(-1px)}
+  .btn-blue{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff}
+  .btn-blue:hover{opacity:.88;transform:translateY(-1px)}
 
   /* ── Form ── */
   .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
@@ -168,6 +170,12 @@
       <button class="btn btn-danger" id="btn-stop" onclick="stopSync()" style="display:none">
         ⛔ Stop Sync
       </button>
+      <button class="btn btn-outline" id="btn-export-csv" onclick="downloadExport('csv')" style="display:none">
+        📥 Download CSV
+      </button>
+      <button class="btn btn-outline" id="btn-export-json" onclick="downloadExport('json')" style="display:none">
+        📥 Download JSON
+      </button>
       <div id="sync-status-text" style="font-size:.82rem;color:var(--muted)">
         Klik untuk mulai scrape semua akun dari Sheets
       </div>
@@ -192,20 +200,27 @@
   <!-- ── LOGIN INSTAGRAM ── -->
   <div class="section">
     <details>
-      <summary>🔐 Login / Logout Instagram</summary>
+      <summary>🔐 Login Instagram</summary>
       <div class="inner">
-        <div class="alert alert-info">💡 Login diperlukan agar scraping mendapat data followers yang akurat. Cookies disimpan otomatis.</div>
+        <div class="alert alert-info">💡 Pilih salah satu cara login di bawah. Cookies disimpan otomatis dan akan dipakai ulang selama masih valid.</div>
         <div id="login-status-box"></div>
-        <div id="login-form">
-          <div class="form-row">
-            <div class="form-group"><label>Username Instagram</label><input type="text" id="ig-user" placeholder="username" autocomplete="off"/></div>
-            <div class="form-group"><label>Password</label><input type="password" id="ig-pass" placeholder="••••••••"/></div>
-          </div>
+
+        <div style="margin-bottom:18px">
+          <div class="section-title" style="font-size:.78rem;margin-bottom:10px">🪟 Login Manual (Buka Chrome)</div>
+          <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Server akan membuka jendela Chrome — login seperti biasa di browser, bot akan mendeteksi sesi secara otomatis. <b>Hanya bisa digunakan saat server berjalan di PC lokal.</b></p>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-green" onclick="doLogin()">🔐 Login</button>
+            <button class="btn btn-blue" onclick="doManualLogin()">🪟 Buka Chrome & Login Manual</button>
             <button class="btn btn-danger" onclick="doLogout()">🚪 Logout</button>
           </div>
         </div>
+
+        <div style="border-top:1px solid var(--border);padding-top:18px">
+          <div class="section-title" style="font-size:.78rem;margin-bottom:10px">📥 Import Cookies (Direkomendasikan)</div>
+          <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Install ekstensi <b>Cookie-Editor</b> di Chrome → buka instagram.com → klik Export → paste di bawah ini.</p>
+          <textarea id="ig-cookies-json" rows="4" placeholder='[{"name":"sessionid","value":"...","domain":".instagram.com"}]' style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem"></textarea>
+          <button class="btn btn-green" style="margin-top:8px" onclick="doImportCookies()">📥 Import & Aktifkan Sesi</button>
+        </div>
+
         <div id="login-msg" style="margin-top:12px;font-size:.82rem"></div>
       </div>
     </details>
@@ -253,6 +268,14 @@ function handleEvent(d) {
   if (d.type === 'syncEnd') {
     setSyncing(false);
     if (d.stats) showStats(d.stats);
+    refreshStatus();
+    toggleExportButtons(true);
+  }
+  if (d.type === 'loginEnd') {
+    showLoginMsg(d.success ? '✅ ' + d.message : '❌ ' + d.message, d.success ? 'ok' : 'err');
+    refreshStatus();
+  }
+  if (d.type === 'loginStatus') {
     refreshStatus();
   }
 }
@@ -327,6 +350,7 @@ async function refreshStatus() {
     }
 
     if (r.lastSyncStats) showStats(r.lastSyncStats);
+    toggleExportButtons((r.exportAvailable || 0) > 0);
 
     const ok = r.loggedIn && r.credentialsReady;
     badge.className  = 'badge ' + (ok ? 'ok' : 'warn');
@@ -365,6 +389,16 @@ async function stopSync() {
   }, 2000);
 }
 
+function toggleExportButtons(show) {
+  const display = show ? 'inline-flex' : 'none';
+  document.getElementById('btn-export-csv').style.display = display;
+  document.getElementById('btn-export-json').style.display = display;
+}
+
+function downloadExport(format) {
+  window.location.href = `${API}/sync/export.${format}`;
+}
+
 // ── Login / Logout ──
 async function doLogin() {
   const u = document.getElementById('ig-user').value.trim();
@@ -374,6 +408,34 @@ async function doLogin() {
   const r = await fetch(`${API}/instagram-login`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ username: u, password: p }),
+  }).then(r => r.json()).catch(() => ({ success: false, message: 'Server tidak merespons' }));
+  showLoginMsg(r.success ? '✅ ' + r.message : '❌ ' + r.message, r.success ? 'ok' : 'err');
+  if (r.success) refreshStatus();
+}
+
+async function doManualLogin() {
+  showLoginMsg('🪟 Meminta server membuka Chrome...', 'info');
+  const r = await fetch(`${API}/instagram-login-manual`, { method: 'POST' })
+    .then(r => r.json()).catch(() => ({ success: false, message: 'Server tidak merespons' }));
+
+  if (r.pending) {
+    showLoginMsg('👤 ' + r.message, 'info');
+    return;
+  }
+
+  showLoginMsg(r.success ? '✅ ' + r.message : '❌ ' + r.message, r.success ? 'ok' : 'err');
+  if (r.success) refreshStatus();
+}
+
+async function doImportCookies() {
+  const raw = document.getElementById('ig-cookies-json').value.trim();
+  if (!raw) return showLoginMsg('⚠️ Paste JSON cookies dulu.', 'warn');
+  let cookies;
+  try { cookies = JSON.parse(raw); } catch { return showLoginMsg('❌ JSON tidak valid.', 'err'); }
+  showLoginMsg('📥 Mengimport cookies...', 'info');
+  const r = await fetch(`${API}/instagram-cookies`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ cookies }),
   }).then(r => r.json()).catch(() => ({ success: false, message: 'Server tidak merespons' }));
   showLoginMsg(r.success ? '✅ ' + r.message : '❌ ' + r.message, r.success ? 'ok' : 'err');
   if (r.success) refreshStatus();

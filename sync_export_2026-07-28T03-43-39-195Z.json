@@ -1,0 +1,60 @@
+{
+  "syncedAt": "2026-07-28T03:43:39.195Z",
+  "stats": {
+    "total": 4,
+    "active": 4,
+    "newAccount": 0,
+    "nonaktif": 0,
+    "error": 0
+  },
+  "results": [
+    {
+      "sheetName": "Novi ",
+      "namaArea": "all sulawesi",
+      "link": "infolokersulawesi.top",
+      "status": "active",
+      "followers": 90,
+      "value": "90",
+      "writtenToSheet": true,
+      "targetDate": "Minggu 4",
+      "targetDateMode": "week",
+      "scrapedAt": "2026-07-28T03:43:01.116Z"
+    },
+    {
+      "sheetName": "Novi ",
+      "namaArea": "Wajo & Bone",
+      "link": "lokerwajoboneid.top",
+      "status": "active",
+      "followers": 1,
+      "value": "1",
+      "writtenToSheet": true,
+      "targetDate": "Minggu 4",
+      "targetDateMode": "week",
+      "scrapedAt": "2026-07-28T03:43:15.257Z"
+    },
+    {
+      "sheetName": "Novi ",
+      "namaArea": "Jayapura",
+      "link": "lokerjayapura.top",
+      "status": "active",
+      "followers": 24634,
+      "value": "24634",
+      "writtenToSheet": true,
+      "targetDate": "Minggu 4",
+      "targetDateMode": "week",
+      "scrapedAt": "2026-07-28T03:43:25.803Z"
+    },
+    {
+      "sheetName": "Novi ",
+      "namaArea": "Ternate",
+      "link": "lokerternate.top",
+      "status": "active",
+      "followers": 2420,
+      "value": "2420",
+      "writtenToSheet": true,
+      "targetDate": "Minggu 4",
+      "targetDateMode": "week",
+      "scrapedAt": "2026-07-28T03:43:38.294Z"
+    }
+  ]
+}

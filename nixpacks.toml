@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["...", "google-chrome"]
+
+[start]
+cmd = "npm start"
