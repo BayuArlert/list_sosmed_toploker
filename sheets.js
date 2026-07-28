@@ -42,27 +42,47 @@ function columnToLetter(col) {
   return letter;
 }
 
-function checkCredentials() {
-  return !!loadGoogleCredentials();
-}
+let sheetsClient = null;
 
-async function getAuth() {
-  const credentials = loadGoogleCredentials();
-  if (!credentials) {
-    throw new Error(
-      'Google credentials tidak ditemukan! ' +
-      'Set GOOGLE_CREDENTIALS di Railway, atau letakkan credentials.json di folder project.'
-    );
+function getGoogleCredentials() {
+  // 1. Coba baca dari file (untuk komputer lokal)
+  if (fs.existsSync(CREDENTIALS_FILE)) {
+    return JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
   }
-  return new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
+  // 2. Coba baca dari Environment Variable (untuk Railway / Cloud)
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    try {
+      return JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    } catch (err) {
+      console.error('⚠️ GOOGLE_CREDENTIALS_JSON tidak valid:', err.message);
+    }
+  }
+  return null;
 }
 
 async function getSheetsClient() {
-  const auth = await getAuth();
-  return google.sheets({ version: 'v4', auth });
+  if (sheetsClient) return sheetsClient;
+
+  const credentials = getGoogleCredentials();
+  if (!credentials) {
+    throw new Error('File credentials.json atau variabel GOOGLE_CREDENTIALS_JSON tidak ditemukan.');
+  }
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+
+  const authClient = await auth.getClient();
+  sheetsClient = google.sheets({ version: 'v4', auth: authClient });
+  return sheetsClient;
+}
+
+/**
+ * Cek apakah kredensial siap digunakan (dipanggil saat startup)
+ */
+function checkCredentials() {
+  return !!getGoogleCredentials();
 }
 
 /**
