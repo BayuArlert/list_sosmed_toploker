@@ -162,6 +162,7 @@ function getPuppeteerLaunchOpts({ manual = false } = {}) {
 
   const launchOpts = {
     headless,
+    protocolTimeout: 300000, // 5 menit (default 180000)
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -693,11 +694,15 @@ async function scrapeAccount(rawLink) {
   // Melakukan request langsung dari browser context menggunakan kredensial aktif
   const directApiCount = await page.evaluate(async (username) => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 detik timeout
       const res = await fetch(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`, {
         headers: {
           'x-ig-app-id': '936619743392459',
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const json = await res.json();
         if (json && json.data && json.data.user && json.data.user.edge_followed_by) {
