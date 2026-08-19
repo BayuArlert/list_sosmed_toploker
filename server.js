@@ -559,6 +559,39 @@ function parseFollowers(raw) {
 //  Return: { status: 'active'|'new'|'nonaktif'|'error', followers: number|null }
 // ═══════════════════════════════════════════════
 async function scrapeAccount(rawLink) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('SCRAPE_TIMEOUT')), 60000); // 60 detik batas maksimal 1 akun
+  });
+
+  try {
+    const result = await Promise.race([
+      doScrapeAccount(rawLink),
+      timeoutPromise
+    ]);
+    clearTimeout(timeoutId);
+    return result;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    // Jika timeout dari promise kita, atau puppeteer yg melempar error timeout
+    if (err.message === 'SCRAPE_TIMEOUT' || err.message.includes('Runtime.callFunctionOn timed out') || err.message.includes('Execution context was destroyed')) {
+      broadcast('log', { message: '  ⚠️  Halaman stuck (timeout internal)! Merestart page...' });
+      try {
+        if (page) await page.close().catch(() => {});
+        page = await browser.newPage();
+        await setupInstagramPage(page);
+        if (fs.existsSync(COOKIES_FILE)) {
+          const cookies = normalizeInstagramCookies(JSON.parse(fs.readFileSync(COOKIES_FILE, 'utf8')));
+          await page.setCookie(...cookies);
+        }
+      } catch (e) {}
+      return { status: 'error', followers: null };
+    }
+    throw err;
+  }
+}
+
+async function doScrapeAccount(rawLink) {
   // Normalisasi URL
   let url = rawLink.trim();
   if (!url.startsWith('http')) url = 'https://' + url;
